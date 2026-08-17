@@ -45,20 +45,38 @@ export default function SkillDetails({
   const isMaxed = rank === skill.MaxRank;
   const isLocked = state === 'locked';
   
-  // Find name of prerequisites
-  const prereqIds = skill.Prerequisites 
-    ? skill.Prerequisites.split(',').map(p => p.trim()).filter(Boolean)
+  // Find name of prerequisites and check required ranks
+  const defaultMinRank = parseInt(skill.PrereqMinRank || 1);
+  const prereqList = skill.Prerequisites 
+    ? skill.Prerequisites.split(',').map(p => {
+        const trimmed = p.trim();
+        if (!trimmed) return null;
+        const parts = trimmed.split(':');
+        const parentId = parts[0].trim();
+        const requiredRank = parts[1] ? parseInt(parts[1].trim()) : defaultMinRank;
+        const pSkill = allSkills.find(s => s.ID === parentId);
+        const currentRank = learnedSkills[parentId] || 0;
+        const isMet = currentRank >= requiredRank;
+        return {
+          id: parentId,
+          name: pSkill ? pSkill.Name : parentId,
+          requiredRank,
+          currentRank,
+          isMet
+        };
+      }).filter(Boolean)
     : [];
-    
-  const prerequisitesInfo = prereqIds.map(pId => {
-    const pSkill = allSkills.find(s => s.ID === pId);
-    const isMet = (learnedSkills[pId] || 0) > 0;
-    return {
-      id: pId,
-      name: pSkill ? pSkill.Name : pId,
-      isMet
-    };
+
+  // Find tier point requirements
+  const reqTierPoints = parseInt(skill.RequiredTierPoints || 0);
+  const heroSkills = allSkills.filter(s => s.Hero === skill.Hero);
+  let spentPointsInLowerTiers = 0;
+  heroSkills.forEach(s => {
+    if (s.Tier < skill.Tier && learnedSkills[s.ID]) {
+      spentPointsInLowerTiers += learnedSkills[s.ID];
+    }
   });
+  const isTierPointsMet = spentPointsInLowerTiers >= reqTierPoints;
 
   // Find name of exclusive skills
   const exclusiveIds = skill.ExclusiveWith
@@ -114,15 +132,32 @@ export default function SkillDetails({
         </div>
 
         {/* Prerequisites section */}
-        {prerequisitesInfo.length > 0 && (
+        {prereqList.length > 0 && (
           <div className="details-requirements-box">
-            <h4 className="req-title">선행 조건</h4>
-            {prerequisitesInfo.map(req => (
+            <h4 className="req-title">
+              선행 조건 {prereqList.length > 1 && (skill.PrereqCondition === 'OR' ? '(다음 중 1개 이상 만족 필요)' : '(다음 모두 만족 필요)')}
+            </h4>
+            {prereqList.map(req => (
               <div key={req.id} className={`req-item ${req.isMet ? 'met' : 'not-met'}`}>
                 {req.isMet ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                <span>{req.name}</span>
+                <span>
+                  {req.name} {req.requiredRank > 1 ? `(${req.requiredRank}레벨 이상)` : ''}
+                </span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Tier Points Requirement section */}
+        {reqTierPoints > 0 && (!skill.Prerequisites) && (
+          <div className="details-requirements-box">
+            <h4 className="req-title">이전 티어 투자 요구</h4>
+            <div className={`req-item ${isTierPointsMet ? 'met' : 'not-met'}`}>
+              {isTierPointsMet ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+              <span>
+                이전 티어에 총 {reqTierPoints} SP 이상 투자 필요 (현재: {spentPointsInLowerTiers} SP)
+              </span>
+            </div>
           </div>
         )}
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Papa from 'papaparse';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { sampleData } from './sampleData';
@@ -15,6 +15,7 @@ export default function App() {
   const [selectedHero, setSelectedHero] = useState(null);
   const [learnedSkills, setLearnedSkills] = useState({});
   const [csvUrl, setCsvUrl] = useState('');
+  const loadedCsvUrlRef = useRef('');
   
   // UI States
   const [selectedSkillId, setSelectedSkillId] = useState(null);
@@ -57,41 +58,15 @@ export default function App() {
     }
   }, [toastMessage]);
 
-  // URL Hash state parsing & restoring on mount / hashchange
-  useEffect(() => {
-    const parseUrlState = () => {
-      const hash = window.location.hash;
-      if (!hash) return;
-      
-      const params = new URLSearchParams(hash.substring(1));
-      const hero = params.get('hero');
-      const buildStr = params.get('build');
-      
-      if (hero) {
-        setSelectedHero(hero);
-      }
-      if (buildStr) {
-        const buildObj = {};
-        buildStr.split(',').forEach(item => {
-          const [id, rank] = item.split(':');
-          if (id && rank) {
-            buildObj[id] = parseInt(rank);
-          }
-        });
-        setLearnedSkills(buildObj);
-      }
-    };
-
-    parseUrlState();
-
-    window.addEventListener('hashchange', parseUrlState);
-    return () => window.removeEventListener('hashchange', parseUrlState);
-  }, []);
-
   // Sync state to URL hash on change
-  const syncStateToHash = (hero, learned) => {
+  const syncStateToHash = (hero, learned, currentCsv = loadedCsvUrlRef.current) => {
     if (!hero) {
-      window.history.replaceState(null, '', window.location.pathname);
+      if (currentCsv) {
+        const hashString = `csv=${encodeURIComponent(currentCsv)}`;
+        window.history.replaceState(null, '', `#${hashString}`);
+      } else {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
       return;
     }
     
@@ -106,9 +81,58 @@ export default function App() {
       }
     });
 
-    const hashString = `hero=${encodeURIComponent(hero)}&build=${buildParts.join(',')}`;
+    let hashString = `hero=${encodeURIComponent(hero)}&build=${buildParts.join(',')}`;
+    if (currentCsv) {
+      hashString = `csv=${encodeURIComponent(currentCsv)}&${hashString}`;
+    }
     window.history.replaceState(null, '', `#${hashString}`);
   };
+
+  // URL Hash state parsing & restoring on mount / hashchange
+  useEffect(() => {
+    const parseUrlState = () => {
+      const hash = window.location.hash;
+      if (!hash) return;
+      
+      const params = new URLSearchParams(hash.substring(1));
+      const csv = params.get('csv');
+      const hero = params.get('hero');
+      const buildStr = params.get('build');
+      
+      const applyBuild = () => {
+        if (hero) {
+          setSelectedHero(hero);
+        } else {
+          setSelectedHero(null);
+        }
+        if (buildStr) {
+          const buildObj = {};
+          buildStr.split(',').forEach(item => {
+            const [id, rank] = item.split(':');
+            if (id && rank) {
+              buildObj[id] = parseInt(rank);
+            }
+          });
+          setLearnedSkills(buildObj);
+        } else {
+          setLearnedSkills({});
+        }
+      };
+
+      if (csv && csv !== loadedCsvUrlRef.current) {
+        handleLoadCsv(csv, () => {
+          applyBuild();
+        });
+      } else {
+        applyBuild();
+      }
+    };
+
+    parseUrlState();
+
+    window.addEventListener('hashchange', parseUrlState);
+    return () => window.removeEventListener('hashchange', parseUrlState);
+  }, [skills]);
 
   // Convert Google Sheet Share link to Direct CSV Link automatically
   const getDirectCsvUrl = (url) => {
@@ -126,11 +150,15 @@ export default function App() {
   };
 
   // Fetch and parse CSV from URL
-  const handleLoadCsv = (overrideUrl) => {
+  const handleLoadCsv = (overrideUrl, callback) => {
     const targetUrl = overrideUrl || csvUrl;
     if (!targetUrl) {
       setError("구글 시트 URL을 입력해 주세요.");
       return;
+    }
+
+    if (overrideUrl) {
+      setCsvUrl(overrideUrl);
     }
 
     const directUrl = getDirectCsvUrl(targetUrl);
@@ -158,16 +186,25 @@ export default function App() {
           MaxRank: parseInt(item.MaxRank || 1),
           Prerequisites: item.Prerequisites || "",
           ExclusiveWith: item.ExclusiveWith || "",
-          Icon: item.Icon || "HelpCircle"
+          Icon: item.Icon || "HelpCircle",
+          PrereqCondition: (item.PrereqCondition || "ALL").trim().toUpperCase(),
+          RequiredTierPoints: parseInt(item.RequiredTierPoints || 0),
+          PrereqMinRank: parseInt(item.PrereqMinRank || 1)
         }));
 
         setSkills(parsed);
+        loadedCsvUrlRef.current = targetUrl;
         setToastMessage("데이터를 성공적으로 불러왔습니다!");
-        setSelectedHero(null);
-        setLearnedSkills({});
-        setSelectedSkillId(null);
-        setHoveredSkillId(null);
-        syncStateToHash(null, {});
+
+        if (callback) {
+          callback(parsed);
+        } else {
+          setSelectedHero(null);
+          setLearnedSkills({});
+          setSelectedSkillId(null);
+          setHoveredSkillId(null);
+          syncStateToHash(null, {}, targetUrl);
+        }
       },
       error: (err) => {
         setIsLoading(false);
@@ -217,25 +254,94 @@ export default function App() {
     });
   };
 
-  // Helper for cascading unlearn:
-  // When a parent is unlearned (rank=0), we must recursively unlearn all children that depend on it.
-  const unlearnSkillCascade = (skillId, currentLearned) => {
-    const updated = { ...currentLearned };
-    const queue = [skillId];
-    
-    while (queue.length > 0) {
-      const currentId = queue.shift();
-      delete updated[currentId];
-      
-      // Find direct children
-      skills.forEach(s => {
-        if (s.Prerequisites) {
-          const prereqs = s.Prerequisites.split(',').map(p => p.trim()).filter(Boolean);
-          if (prereqs.includes(currentId) && updated[s.ID] !== undefined) {
-            queue.push(s.ID);
+  // Unified validation for skill unlock conditions
+  const isSkillUnlockable = (skill, learned, allSkills) => {
+    // 1. Check mutual exclusivity
+    if (skill.ExclusiveWith) {
+      const exclusives = skill.ExclusiveWith.split(',').map(e => e.trim()).filter(Boolean);
+      const conflict = exclusives.some(eId => (learned[eId] || 0) > 0);
+      if (conflict) {
+        return { unlockable: false, reason: "MUTUALLY_EXCLUSIVE" };
+      }
+    }
+
+    // 2. Check Prerequisites (if any)
+    if (skill.Prerequisites) {
+      const defaultMinRank = parseInt(skill.PrereqMinRank || 1);
+      const prereqList = skill.Prerequisites.split(',').map(p => {
+        const trimmed = p.trim();
+        if (!trimmed) return null;
+        const parts = trimmed.split(':');
+        const parentId = parts[0].trim();
+        const requiredRank = parts[1] ? parseInt(parts[1].trim()) : defaultMinRank;
+        return { parentId, requiredRank };
+      }).filter(Boolean);
+
+      if (prereqList.length > 0) {
+        const condition = (skill.PrereqCondition || "ALL").toUpperCase();
+        
+        const checkMet = (req) => {
+          const rank = learned[req.parentId] || 0;
+          return rank >= req.requiredRank;
+        };
+
+        if (condition === "OR") {
+          const met = prereqList.some(checkMet);
+          if (!met) {
+            return { unlockable: false, reason: "PREREQUISITES_NOT_MET_OR" };
+          }
+        } else { // ALL
+          const met = prereqList.every(checkMet);
+          if (!met) {
+            return { unlockable: false, reason: "PREREQUISITES_NOT_MET_ALL" };
           }
         }
-      });
+      }
+    } else {
+      // 3. Check Tier Point Requirements (only if no prerequisites)
+      const reqPoints = parseInt(skill.RequiredTierPoints || 0);
+      if (reqPoints > 0 && (skill.Tier || 1) >= 2) {
+        const heroSkills = allSkills.filter(s => s.Hero === skill.Hero);
+        let spentPoints = 0;
+        heroSkills.forEach(s => {
+          if (s.Tier < skill.Tier && learned[s.ID]) {
+            spentPoints += learned[s.ID];
+          }
+        });
+        
+        if (spentPoints < reqPoints) {
+          return { unlockable: false, reason: "TIER_POINTS_NOT_MET", required: reqPoints, current: spentPoints };
+        }
+      }
+    }
+
+    return { unlockable: true, reason: "" };
+  };
+
+  // Iteratively prune learned skills that no longer satisfy their prerequisites or tier point requirements
+  const pruneInvalidSkills = (currentLearned) => {
+    let updated = { ...currentLearned };
+    let changed = true;
+    
+    while (changed) {
+      changed = false;
+      const activeIds = Object.keys(updated).filter(id => updated[id] > 0);
+      
+      for (const skillId of activeIds) {
+        const skill = skills.find(s => s.ID === skillId);
+        if (!skill) continue;
+        
+        // Temporarily treat this skill's rank as 0 to verify if the path is still valid
+        const stateWithoutSkill = { ...updated };
+        delete stateWithoutSkill[skillId];
+        
+        const { unlockable } = isSkillUnlockable(skill, stateWithoutSkill, skills);
+        if (!unlockable) {
+          delete updated[skillId];
+          changed = true;
+          break; // break loop and restart scanning since hierarchy changed
+        }
+      }
     }
     
     return updated;
@@ -246,32 +352,37 @@ export default function App() {
     const skill = skills.find(s => s.ID === skillId);
     if (!skill) return;
 
-    // Check prerequisites
-    if (skill.Prerequisites) {
-      const prereqs = skill.Prerequisites.split(',').map(p => p.trim()).filter(Boolean);
-      const unmetPrereqs = prereqs.filter(pId => !learnedSkills[pId] || learnedSkills[pId] === 0);
-      if (unmetPrereqs.length > 0) {
+    // Check prerequisites & point thresholds using the new unified function
+    const currentRank = learnedSkills[skillId] || 0;
+    const stateWithoutSkill = { ...learnedSkills };
+    delete stateWithoutSkill[skillId];
+
+    const { unlockable, reason, required, current } = isSkillUnlockable(skill, stateWithoutSkill, skills);
+    if (!unlockable) {
+      if (reason === "TIER_POINTS_NOT_MET") {
+        setToastMessage(`선행 포인트 부족: 이전 티어에 총 ${required} SP가 필요합니다. (현재: ${current} SP)`);
+      } else {
         setToastMessage("선행 조건을 달성하지 못했습니다.");
-        return;
       }
+      return;
     }
 
     let newLearned = { ...learnedSkills };
 
-    // Check mutual exclusivity.
-    // If we learn this, we must unlearn any exclusive skill and its children!
+    // Check mutual exclusivity
     if (skill.ExclusiveWith) {
       const exclusives = skill.ExclusiveWith.split(',').map(e => e.trim()).filter(Boolean);
       exclusives.forEach(excId => {
-        if (newLearned[excId]) {
-          newLearned = unlearnSkillCascade(excId, newLearned);
-        }
+        delete newLearned[excId];
       });
     }
 
-    const currentRank = newLearned[skillId] || 0;
     if (currentRank < skill.MaxRank) {
       newLearned[skillId] = currentRank + 1;
+      
+      // Prune list to clean up any cascading invalidations
+      newLearned = pruneInvalidSkills(newLearned);
+      
       setLearnedSkills(newLearned);
       syncStateToHash(selectedHero, newLearned);
 
@@ -296,11 +407,13 @@ export default function App() {
 
     let newLearned = { ...learnedSkills };
     if (currentRank === 1) {
-      // Goes to 0, trigger cascade unlearn for dependents
-      newLearned = unlearnSkillCascade(skillId, newLearned);
+      delete newLearned[skillId];
     } else {
       newLearned[skillId] = currentRank - 1;
     }
+    
+    // Prune list to clean up any cascading invalidations
+    newLearned = pruneInvalidSkills(newLearned);
     
     setLearnedSkills(newLearned);
     syncStateToHash(selectedHero, newLearned);
@@ -360,6 +473,7 @@ export default function App() {
               onUnlearnSkill={handleUnlearnSkill}
               onHoverSkill={(skill) => setHoveredSkillId(skill.ID)}
               onLeaveSkill={() => setHoveredSkillId(null)}
+              isSkillUnlockable={isSkillUnlockable}
             />
 
             <SkillDetails
@@ -372,19 +486,8 @@ export default function App() {
                       : (activeHeroSkills.find(s => s.ID === activeDetailSkill.ID) && 
                          (() => {
                            const s = activeHeroSkills.find(s => s.ID === activeDetailSkill.ID);
-                           // Check prerequisites
-                           if (s.Prerequisites) {
-                             const prereqs = s.Prerequisites.split(',').map(p => p.trim()).filter(Boolean);
-                             const met = prereqs.every(pId => (learnedSkills[pId] || 0) > 0);
-                             if (!met) return 'locked';
-                           }
-                           // Check exclusives
-                           if (s.ExclusiveWith) {
-                             const exclusives = s.ExclusiveWith.split(',').map(e => e.trim()).filter(Boolean);
-                             const conflict = exclusives.some(eId => (learnedSkills[eId] || 0) > 0);
-                             if (conflict) return 'locked';
-                           }
-                           return 'available';
+                           const { unlockable } = isSkillUnlockable(s, learnedSkills, skills);
+                           return unlockable ? 'available' : 'locked';
                          })())
                     )
                   : 'locked'

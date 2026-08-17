@@ -13,6 +13,17 @@ export const sampleData = [
   },
   {
     Hero: "라인하르트",
+    ID: "REIN_MELEE_SWING",
+    Name: "망치 숙련 (Hammer Mastery)",
+    Tier: 1,
+    MaxRank: 3,
+    Description: "기본 망치 공격의 공격 속도가 {rank * 8}% 증가합니다.",
+    Prerequisites: "",
+    ExclusiveWith: "",
+    Icon: "Sword"
+  },
+  {
+    Hero: "라인하르트",
     ID: "REIN_SHIELD_REGEN",
     Name: "방벽 급속 복원 (Shield Restoration)",
     Tier: 2,
@@ -32,6 +43,18 @@ export const sampleData = [
     Prerequisites: "REIN_SHIELD_BASE",
     ExclusiveWith: "",
     Icon: "Move"
+  },
+  {
+    Hero: "라인하르트",
+    ID: "REIN_TITAN_ARMOR",
+    Name: "거인의 장갑 (Titan Armor)",
+    Tier: 2,
+    MaxRank: 2,
+    Description: "최대 생명력이 {rank * 50} 증가합니다. (해금 조건: 1티어 스킬에 총 3 SP 이상 투자)",
+    Prerequisites: "",
+    ExclusiveWith: "",
+    Icon: "ShieldAlert",
+    RequiredTierPoints: 3
   },
   {
     Hero: "라인하르트",
@@ -68,12 +91,35 @@ export const sampleData = [
   },
   {
     Hero: "라인하르트",
+    ID: "REIN_SHIELD_MASTER",
+    Name: "철옹성 (Iron Fortress)",
+    Tier: 4,
+    MaxRank: 1,
+    Description: "피드백 회로 또는 에너지 편향 중 하나가 활성화되어야 해금됩니다. 방벽 내구도가 150 증가하고 복원 속도가 20% 증가합니다.",
+    Prerequisites: "REIN_SHIELD_EXPLODE,REIN_SHIELD_REFLECT",
+    PrereqCondition: "OR",
+    ExclusiveWith: "",
+    Icon: "Shield"
+  },
+  {
+    Hero: "라인하르트",
     ID: "REIN_EARTHSHATTER_EXT",
     Name: "대지분쇄: 공명 (Earthshatter: Resonance)",
     Tier: 5,
     MaxRank: 2,
     Description: "대지분쇄의 사거리가 {rank * 20}% 증가하며, 기절한 적에게 주는 모든 피해량이 {rank * 15}% 증가합니다.",
     Prerequisites: "REIN_CHARGE_BASE",
+    ExclusiveWith: "",
+    Icon: "Flame"
+  },
+  {
+    Hero: "라인하르트",
+    ID: "REIN_SHATTER_SHOCK",
+    Name: "대지분쇄: 격동 (Earthshatter: Cataclysm)",
+    Tier: 5,
+    MaxRank: 1,
+    Description: "대지분쇄: 공명 2레벨 이상이 필요합니다. 대지분쇄 충격파가 적을 공중에 1.5초간 띄우고 추가 피해를 줍니다.",
+    Prerequisites: "REIN_EARTHSHATTER_EXT:2",
     ExclusiveWith: "",
     Icon: "Flame"
   },
