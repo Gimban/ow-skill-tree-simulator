@@ -35,7 +35,7 @@ export default function SkillDetails({
           <Shield className="empty-panel-icon" />
           <h3>스킬 상세 정보</h3>
           <p style={{ fontSize: '0.9rem', marginTop: '10px' }}>
-            스킬 노드에 마우스를 올리거나 클릭하여 상세 효과를 확인하세요.
+            스킬 노드에 마우스를 올려 상세 효과를 확인하세요.
           </p>
         </div>
       </div>
@@ -44,27 +44,27 @@ export default function SkillDetails({
 
   const isMaxed = rank === skill.MaxRank;
   const isLocked = state === 'locked';
-  
+
   // Find name of prerequisites and check required ranks
   const defaultMinRank = parseInt(skill.PrereqMinRank || 1);
-  const prereqList = skill.Prerequisites 
+  const prereqList = skill.Prerequisites
     ? skill.Prerequisites.split(',').map(p => {
-        const trimmed = p.trim();
-        if (!trimmed) return null;
-        const parts = trimmed.split(':');
-        const parentId = parts[0].trim();
-        const requiredRank = parts[1] ? parseInt(parts[1].trim()) : defaultMinRank;
-        const pSkill = allSkills.find(s => s.ID === parentId);
-        const currentRank = learnedSkills[parentId] || 0;
-        const isMet = currentRank >= requiredRank;
-        return {
-          id: parentId,
-          name: pSkill ? pSkill.Name : parentId,
-          requiredRank,
-          currentRank,
-          isMet
-        };
-      }).filter(Boolean)
+      const trimmed = p.trim();
+      if (!trimmed) return null;
+      const parts = trimmed.split(':');
+      const parentId = parts[0].trim();
+      const requiredRank = parts[1] ? parseInt(parts[1].trim()) : defaultMinRank;
+      const pSkill = allSkills.find(s => s.ID === parentId);
+      const currentRank = learnedSkills[parentId] || 0;
+      const isMet = currentRank >= requiredRank;
+      return {
+        id: parentId,
+        name: pSkill ? pSkill.Name : parentId,
+        requiredRank,
+        currentRank,
+        isMet
+      };
+    }).filter(Boolean)
     : [];
 
   // Find tier point requirements
@@ -82,7 +82,7 @@ export default function SkillDetails({
   const exclusiveIds = skill.ExclusiveWith
     ? skill.ExclusiveWith.split(',').map(e => e.trim()).filter(Boolean)
     : [];
-    
+
   const exclusivesInfo = exclusiveIds.map(eId => {
     const eSkill = allSkills.find(s => s.ID === eId);
     const isActive = (learnedSkills[eId] || 0) > 0;

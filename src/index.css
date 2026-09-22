@@ -605,6 +605,29 @@ body {
   border-color: #fff;
 }
 
+/* Selected Node Visual Highlight */
+.skill-node-wrapper.selected-wrapper {
+  z-index: 10 !important;
+}
+
+.skill-node.selected {
+  border-color: #ffffff !important;
+  transform: scale(1.18);
+  animation: node-pulse-selected 1.8s infinite !important;
+}
+
+@keyframes node-pulse-selected {
+  0%, 100% {
+    box-shadow: 0 0 20px #ffffff, 0 0 35px var(--color-active), inset 0 0 15px rgba(255, 255, 255, 0.5);
+    border-color: #ffffff;
+  }
+  50% {
+    box-shadow: 0 0 30px #ffffff, 0 0 50px var(--color-available), inset 0 0 25px rgba(0, 240, 255, 0.8);
+    border-color: var(--color-available);
+  }
+}
+
+
 /* Skill point counter badge */
 .skill-rank-badge {
   position: absolute;

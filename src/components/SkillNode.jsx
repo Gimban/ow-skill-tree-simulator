@@ -24,10 +24,11 @@ export default function SkillNode({
 
   return (
     <div
-      className="skill-node-wrapper"
+      className={`skill-node-wrapper ${isSelected ? 'selected-wrapper' : ''}`}
       style={{
         left: `${skill.x}px`,
         top: `${skill.y}px`,
+        zIndex: isSelected ? 10 : 2
       }}
       onMouseEnter={() => onMouseEnter(skill)}
       onMouseLeave={onMouseLeave}
@@ -42,7 +43,7 @@ export default function SkillNode({
         className={`skill-node ${state} ${isMaxed ? 'maxed' : ''} ${isSelected ? 'selected' : ''}`}
         onClick={() => onClick(skill.ID)}
         onContextMenu={handleContextMenu}
-        title="[좌클릭] 스킬 습득 / [우클릭] 스킬 취소"
+        title={isSelected ? "[좌클릭] 레벨 업 / [우클릭] 레벨 감소" : "[좌클릭] 스킬 선택 (선택 후 재좌클릭 시 레벨 업) / [우클릭] 레벨 감소"}
       >
         <div className="skill-node-inner">
           <IconComponent className="skill-node-icon" size={24} strokeWidth={2} />

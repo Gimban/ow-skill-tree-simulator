@@ -36,6 +36,28 @@ export default function SkillTree({
     setZoom(1.0);
   };
 
+  // Mouse Wheel zoom handler (with preventDefault for browser scroll)
+  useEffect(() => {
+    const viewportEl = viewportRef.current;
+    if (!viewportEl) return;
+
+    const handleWheel = (e) => {
+      e.preventDefault();
+      const zoomStep = 0.05;
+      if (e.deltaY < 0) {
+        setZoom(prev => Math.min(1.5, Math.round((prev + zoomStep) * 100) / 100));
+      } else if (e.deltaY > 0) {
+        setZoom(prev => Math.max(0.5, Math.round((prev - zoomStep) * 100) / 100));
+      }
+    };
+
+    viewportEl.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      viewportEl.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
+
+
   // Center the canvas on viewport load
   useEffect(() => {
     if (viewportRef.current) {
@@ -387,7 +409,13 @@ export default function SkillTree({
                 state={nodeState}
                 rank={rank}
                 isSelected={isSelected}
-                onClick={onSelectSkill}
+                onClick={(id) => {
+                  if (isSelected) {
+                    onLearnSkill(id);
+                  } else {
+                    onSelectSkill(id);
+                  }
+                }}
                 onRightClick={onUnlearnSkill}
                 onMouseEnter={onHoverSkill}
                 onMouseLeave={onLeaveSkill}
