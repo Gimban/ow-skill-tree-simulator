@@ -4,19 +4,40 @@ import { Shield, CheckCircle2, XCircle, AlertTriangle, Plus, Minus } from 'lucid
 // Helper to evaluate and format skill descriptions containing math expressions like {rank * 10}
 export const formatDescription = (desc, rankValue) => {
   if (!desc) return '';
-  return desc.replace(/\{([^}]+)\}/g, (match, expression) => {
+  const parts = [];
+  let lastIndex = 0;
+  const regex = /\{([^}]+)\}/g;
+  let match;
+
+  while ((match = regex.exec(desc)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(desc.substring(lastIndex, match.index));
+    }
+    
+    const expression = match[1];
+    let evaluatedVal = match[0];
     try {
-      // Replace the token 'rank' with the actual rank value
       const sanitized = expression.replace(/\brank\b/g, rankValue);
-      // Evaluate expression
       const evalResult = new Function(`return ${sanitized}`)();
-      // Format number to 2 decimal places maximum, and remove trailing zeros
-      return typeof evalResult === 'number' ? Number(evalResult.toFixed(2)) : evalResult;
+      evaluatedVal = typeof evalResult === 'number' ? Number(evalResult.toFixed(2)) : evalResult;
     } catch (e) {
       console.error("Error evaluating expression: ", expression, e);
-      return match;
     }
-  });
+
+    parts.push(
+      <strong key={match.index} className="desc-highlight">
+        {evaluatedVal}
+      </strong>
+    );
+
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < desc.length) {
+    parts.push(desc.substring(lastIndex));
+  }
+
+  return parts;
 };
 
 export default function SkillDetails({

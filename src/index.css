@@ -804,6 +804,13 @@ body {
   margin-bottom: 3px;
 }
 
+.desc-highlight {
+  color: var(--color-active-border, #ffaf38);
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(249, 158, 26, 0.4);
+  padding: 0 1px;
+}
+
 .details-requirements-box {
   display: flex;
   flex-direction: column;
